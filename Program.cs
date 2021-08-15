@@ -22,7 +22,8 @@ namespace ServiceStation_01
         private Store _store;
         private int _carsNumber;
         private int _storeMaxCapacity;
-        private List<int> _performedWorks;
+        private List<PerformedWork> _performedWorks;
+        private int _penalty;
 
         public ServiceCenter()
         {
@@ -31,6 +32,8 @@ namespace ServiceStation_01
             _storeMaxCapacity = _carsNumber * 4;
             _cars = new Queue<Car>();
             _store = new Store(_storeMaxCapacity);
+            _performedWorks = new List<PerformedWork>();
+            _penalty = 200;
         }
 
         public void Work()
@@ -47,17 +50,17 @@ namespace ServiceStation_01
             {
                 Console.Clear();
                 ShowTitle();
-                
+
                 _store.ShowInfo();
                 Console.WriteLine();
 
                 Car car = _cars.Dequeue();
                 car.ShowInfo();
-                
+
                 CarRepair(car);
 
-                Console.Write($"нажмите enter для следующей машины: ");
-                Console.ReadKey();
+                //Console.Write($"нажмите enter для следующей машины: ");
+                //Console.ReadKey();
             }
 
         }
@@ -75,7 +78,8 @@ namespace ServiceStation_01
             bool doRepair = true;
             int detailIndex;
             detailIndex = 0;
-            int toPay = 0;
+            int currentPay = 0;
+            _performedWorks.Clear();
 
             while (doRepair)
             {
@@ -89,12 +93,14 @@ namespace ServiceStation_01
                 Console.Write($"\n1-8 - номер детали со склада для замены\nnext - закончить ремонт\nВведите команду: ");
                 string userInput = Console.ReadLine();
 
-                if(userInput == "next")
+                if (userInput == "next")
                 {
+                    _money -= CalculatePenalty(car);
+                    _money += CalculateCosts();
                     doRepair = false;
                 }
                 else
-                {  
+                {
                     bool result = int.TryParse(userInput, out int number);
 
                     if (result)
@@ -111,26 +117,32 @@ namespace ServiceStation_01
                         }
                     }
 
-                    if (!_store.AvailableQuantity(detailIndex) || !car.AvaliableCondition(detailIndex))
+                    if (result && (!_store.AvailableQuantity(detailIndex) || !car.AvaliableCondition(detailIndex)))
                     {
                         Console.WriteLine($"штраф");
-                        toPay += _store.GetPrice(detailIndex);
-                        _money -= toPay;
+                        currentPay = _store.GetPrice(detailIndex) * (-1);
+                        DateTime timeNow = DateTime.Now;
+                        _performedWorks.Add(new PerformedWork((currentPay), _store.GetName(detailIndex), timeNow));
                     }
 
                     if (result && _store.AvailableQuantity(detailIndex) && car.AvaliableCondition(detailIndex))
                     {
-                        Console.WriteLine($"деталь можно чинить");
                         int newCondition = _store.GetNewDetailCondition(detailIndex);
                         car.ReplaceDetail(detailIndex, newCondition);
-                        toPay += _store.GetPrice(detailIndex)*3/2;
-                        _money += toPay;
+                        currentPay = _store.GetPrice(detailIndex) * 3 / 2;
+                        DateTime timeNow = DateTime.Now;
+                        _performedWorks.Add(new PerformedWork((currentPay), _store.GetName(detailIndex), timeNow));
                     }
-                    toPay = 0;
+                    currentPay = 0;
+                    Console.WriteLine($"выполненные работы");
+                    for (int i = 0; i < _performedWorks.Count; i++)
+                    {
+                        _performedWorks[i].ShowInfo();
+                    }
                 }
 
-                
-                
+                Console.Write($"любую для продолжения ... ");
+                Console.ReadKey();
                 Console.Clear();
             }
         }
@@ -139,6 +151,16 @@ namespace ServiceStation_01
         {
             Console.WriteLine($"Автосервис\tбаланс {_money} рублей");
             Console.WriteLine($"машин в очереди {_cars.Count}");
+        }
+
+        private int CalculateCosts()
+        {
+            return _performedWorks.Sum(work => work.Price);
+        }
+
+        private int CalculatePenalty(Car car)
+        {
+            return car.failRepair() * _penalty;
         }
     }
 
@@ -158,6 +180,25 @@ namespace ServiceStation_01
         protected abstract ScheduledMintenance CreateScheduledMintenance();
         protected abstract Snubber CreateSnubber();
         protected abstract TimingBelt CreateTimingBelt();
+    }
+
+    class PerformedWork
+    {
+        public int Price { get; private set; }
+        public string Detail { get; private set; }
+        public DateTime Time { get; private set; }
+
+        public PerformedWork(int price, string detail, DateTime time)
+        {
+            Price = price;
+            Detail = detail;
+            Time = time;
+        }
+
+        public void ShowInfo()
+        {
+            Console.WriteLine($"замена {Detail}, {Price} рублей, время {Time}");
+        }
     }
 
     class Store : AbstractCreator
@@ -234,6 +275,11 @@ namespace ServiceStation_01
         public int GetPrice(int index)
         {
             return _details[index].Price;
+        }
+
+        public string GetName(int index)
+        {
+            return _details[index].Name;
         }
 
         private void ChangeQuantity()
@@ -369,7 +415,7 @@ namespace ServiceStation_01
 
         public void ShowInfo()
         {
-            var filteredByCondition = _details.OrderBy(detail =>detail.Condition).ToList();
+            var filteredByCondition = _details.OrderBy(detail => detail.Condition).ToList();
             Console.WriteLine($"название\t\tсостояние");
             for (int i = 0; i < filteredByCondition.Count; i++)
             {
@@ -401,6 +447,12 @@ namespace ServiceStation_01
         public int GetPrice(int index)
         {
             return _details[index].Price;
+        }
+
+        public int failRepair()
+        {
+            var failRepair = _details.Where(detail => detail.Condition <= _minCondition);
+            return failRepair.Count();
         }
 
         protected override BrakePads CreateBrakePads()
@@ -463,7 +515,7 @@ namespace ServiceStation_01
 
         public void ShowInfo()
         {
-            Console.WriteLine($"{Name} \t   {Quantity} \t{Price}\t{Price/2}");
+            Console.WriteLine($"{Name} \t   {Quantity} \t{Price}\t{Price / 2}");
         }
 
         public void ShowInfo(int minCondition)
@@ -475,7 +527,7 @@ namespace ServiceStation_01
             {
                 Console.ForegroundColor = ConsoleColor.Red;
             }
-            
+
             Console.WriteLine($"{Name} \t{Condition:d2}");
             Console.ForegroundColor = color;
         }
