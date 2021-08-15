@@ -22,6 +22,7 @@ namespace ServiceStation_01
         private Store _store;
         private int _carsNumber;
         private int _storeMaxCapacity;
+        private int _coefficient;
         private List<PerformedWork> _performedWorks;
         private int _penalty;
 
@@ -29,7 +30,8 @@ namespace ServiceStation_01
         {
             _money = 0;
             _carsNumber = 5;
-            _storeMaxCapacity = _carsNumber * 4;
+            _coefficient = 5;
+            _storeMaxCapacity = _carsNumber * _coefficient;
             _cars = new Queue<Car>();
             _store = new Store(_storeMaxCapacity);
             _performedWorks = new List<PerformedWork>();
@@ -45,7 +47,6 @@ namespace ServiceStation_01
 
             _store.MakeOrder();
 
-
             while (_cars.Count > 0)
             {
                 Console.Clear();
@@ -60,7 +61,7 @@ namespace ServiceStation_01
                 CarRepair(car);
             }
 
-            Console.Write($"рабочий день окончен\nнажмите любую для завершения ...");
+            Console.Write($"рабочий день окончен\nприбыль за сегодня {_money} рублей\nнажмите любую для завершения ...");
             Console.ReadKey();
         }
 
@@ -118,7 +119,7 @@ namespace ServiceStation_01
 
                     if (result && (!_store.AvailableQuantity(detailIndex) || !car.AvaliableCondition(detailIndex)))
                     {
-                        Console.WriteLine($"штраф");
+                        Console.WriteLine($"штраф за попытку заменить целую деталь");
                         currentPay = _store.GetPrice(detailIndex) * (-1);
                         DateTime timeNow = DateTime.Now;
                         _performedWorks.Add(new PerformedWork((currentPay), _store.GetName(detailIndex), timeNow));
@@ -126,6 +127,7 @@ namespace ServiceStation_01
 
                     if (result && _store.AvailableQuantity(detailIndex) && car.AvaliableCondition(detailIndex))
                     {
+                        _store.DecreaseQuantity(detailIndex);
                         int newCondition = _store.GetNewDetailCondition(detailIndex);
                         car.ReplaceDetail(detailIndex, newCondition);
                         currentPay = _store.GetPrice(detailIndex) * 3 / 2;
@@ -159,7 +161,10 @@ namespace ServiceStation_01
 
         private int CalculatePenalty(Car car)
         {
-            return car.failRepair() * _penalty;
+            int penalty = car.failRepair() * _penalty;
+            Console.WriteLine($"Штраф за отсутствие детали на складе - {penalty} рублей");
+            Console.ReadKey();
+            return penalty;
         }
     }
 
@@ -284,6 +289,14 @@ namespace ServiceStation_01
         public int GetCount()
         {
             return _details.Count;
+        }
+
+        public void DecreaseQuantity(int index)
+        {
+            if(_details[index].Quantity > 0)
+            {
+                _details[index].DeleteDetail();
+            }
         }
 
         public int GetNewDetailCondition(int index)
@@ -415,22 +428,12 @@ namespace ServiceStation_01
         public void ShowInfo()
         {
             var filteredByCondition = _details.OrderBy(detail => detail.Condition).ToList();
+            Console.WriteLine($"Машина на подъемнике");
+            Console.WriteLine($"--------------------");
             Console.WriteLine($"название\t\tсостояние");
             for (int i = 0; i < filteredByCondition.Count; i++)
             {
                 filteredByCondition[i].ShowInfo(_minCondition);
-            }
-        }
-
-        public void GetBrokenDetail()
-        {
-            var brokenDetail = from Detail detail in _details
-                               where detail.Condition <= _minCondition
-                               select detail;
-
-            foreach (var detail in brokenDetail)
-            {
-                Console.WriteLine($"{detail.Name} - {detail.Condition}");
             }
         }
 
@@ -544,6 +547,11 @@ namespace ServiceStation_01
         public void SetNewCondition(int value)
         {
             Condition = value;
+        }
+
+        public void DeleteDetail()
+        {
+            Quantity--;
         }
     }
 
