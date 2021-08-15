@@ -22,6 +22,7 @@ namespace ServiceStation_01
         private Store _store;
         private int _carsNumber;
         private int _storeMaxCapacity;
+        private List<int> _performedWorks;
 
         public ServiceCenter()
         {
@@ -41,22 +42,24 @@ namespace ServiceStation_01
 
             _store.MakeOrder();
 
+
             while (_cars.Count > 0)
             {
                 Console.Clear();
-                Console.WriteLine($"Автосервис\tбаланс {_money} рублей");
-                Console.WriteLine($"машин в очереди {_cars.Count}");
-
+                ShowTitle();
+                
                 _store.ShowInfo();
                 Console.WriteLine();
 
                 Car car = _cars.Dequeue();
                 car.ShowInfo();
+                
+                CarRepair(car);
 
-                ReplaceDetail();
-
+                Console.Write($"нажмите enter для следующей машины: ");
                 Console.ReadKey();
             }
+
         }
 
         private void CreateCar(int number)
@@ -67,29 +70,75 @@ namespace ServiceStation_01
             }
         }
 
-        private void ReplaceDetail()
+        private void CarRepair(Car car)
         {
-            bool isFix = true;
+            bool doRepair = true;
+            int detailIndex;
+            detailIndex = 0;
+            int toPay = 0;
 
-            while (isFix)
+            while (doRepair)
             {
-                Console.Write($"Введите номер детали для замены, next - завершить ремонт машины");
+                Console.Clear();
+                ShowTitle();
+                Console.WriteLine();
+                _store.ShowInfo();
+                Console.WriteLine();
+                car.ShowInfo();
+
+                Console.Write($"\n1-8 - номер детали со склада для замены\nnext - закончить ремонт\nВведите команду: ");
                 string userInput = Console.ReadLine();
 
-                if (userInput == "next")
+                if(userInput == "next")
                 {
-                    isFix = false;
+                    doRepair = false;
                 }
                 else
-                {
-                    bool result = int.TryParse(Console.ReadLine(), out int number);
+                {  
+                    bool result = int.TryParse(userInput, out int number);
 
                     if (result)
                     {
-                        if(number >=0 && number <= )
+                        int upperLimit = _store.GetCount();
+
+                        if (number > 0 && number <= upperLimit)
+                        {
+                            detailIndex = number - 1;
+                        }
+                        else
+                        {
+                            result = false;
+                        }
                     }
+
+                    if (!_store.AvailableQuantity(detailIndex) || !car.AvaliableCondition(detailIndex))
+                    {
+                        Console.WriteLine($"штраф");
+                        toPay += _store.GetPrice(detailIndex);
+                        _money -= toPay;
+                    }
+
+                    if (result && _store.AvailableQuantity(detailIndex) && car.AvaliableCondition(detailIndex))
+                    {
+                        Console.WriteLine($"деталь можно чинить");
+                        int newCondition = _store.GetNewDetailCondition(detailIndex);
+                        car.ReplaceDetail(detailIndex, newCondition);
+                        toPay += _store.GetPrice(detailIndex)*3/2;
+                        _money += toPay;
+                    }
+                    toPay = 0;
                 }
+
+                
+                
+                Console.Clear();
             }
+        }
+
+        private void ShowTitle()
+        {
+            Console.WriteLine($"Автосервис\tбаланс {_money} рублей");
+            Console.WriteLine($"машин в очереди {_cars.Count}");
         }
     }
 
@@ -115,6 +164,7 @@ namespace ServiceStation_01
     {
         private int _capacity;
         private int _maxCapacity;
+
         public Store(int maxCapacity) : base()
         {
             _details.Add(CreateBrakePads());
@@ -132,9 +182,11 @@ namespace ServiceStation_01
 
         public void ShowInfo()
         {
+            _capacity = CalculateCapacity();
+
             Console.WriteLine($"Вместимость склада {_capacity}/{_maxCapacity}");
-            Console.WriteLine($"№   название\t\tкол-во\tцена");
-            Console.WriteLine($"-------------------------------------");
+            Console.WriteLine($"№   название\t\tкол-во\tцена\tработа");
+            Console.WriteLine($"-----------------------------------------------");
             for (int i = 0; i < _details.Count; i++)
             {
                 Console.Write($"{i + 1:d2}. ");
@@ -144,11 +196,11 @@ namespace ServiceStation_01
 
         public void MakeOrder()
         {
-            bool exit = false;
+            bool isFillUp = true;
 
             string userInput = "";
 
-            while (exit == false)
+            while (isFillUp)
             {
                 Console.WriteLine();
                 ShowInfo();
@@ -158,32 +210,45 @@ namespace ServiceStation_01
                     Console.WriteLine($"\nна складе нет места");
                 }
 
-                Console.WriteLine($"\nexit - выход, next - продолжить наполнение склада");
+                Console.WriteLine($"\nexit - завершить наполнение склада\nenter - продолжить наполнение склада");
                 userInput = Console.ReadLine();
-                if (userInput == "next")
+
+                switch (userInput)
                 {
-                    exit = true;
-                }
-                else
-                {
-                    ChangeQuantity();
+                    case "exit":
+                        isFillUp = false;
+                        break;
+                    case "test":
+                        for (int i = 0; i < _details.Count; i++)
+                        {
+                            _details[i].SetTestQuantity();
+                        }
+                        break;
+                    default:
+                        ChangeQuantity();
+                        break;
                 }
             }
         }
 
-        public void ChangeQuantity()
+        public int GetPrice(int index)
+        {
+            return _details[index].Price;
+        }
+
+        private void ChangeQuantity()
         {
             int freePlaces = _maxCapacity - _capacity;
             Console.Write($"Введите номер позиции товара на складе: ");
 
             if (GetNumber(out int number))
             {
-                if (number >= 0 && number <= _details.Count)
+                if (number >= 1 && number <= _details.Count)
                 {
                     int index = number - 1;
-                    Console.WriteLine($"{_details[index].Name}");
+                    Console.WriteLine($"{_details[index].Name}: {_details[index].Quantity}");
 
-                    Console.Write($"Введите количество: ");
+                    Console.Write($"Добавить количество: ");
                     if (GetNumber(out int value))
                     {
                         if (value <= freePlaces)
@@ -215,7 +280,29 @@ namespace ServiceStation_01
             Console.Clear();
         }
 
-        private bool GetNumber(out int number)
+        public int GetCount()
+        {
+            return _details.Count;
+        }
+
+        public int GetNewDetailCondition(int index)
+        {
+            return _details[index].Condition;
+        }
+
+        public bool AvailableQuantity(int index)
+        {
+            return _details[index].Quantity > 0;
+        }
+
+        private int CalculateCapacity()
+        {
+            int currentCapacity = _details.Sum(detail => detail.Quantity);
+
+            return currentCapacity;
+        }
+
+        public bool GetNumber(out int number)
         {
             bool result = int.TryParse(Console.ReadLine(), out number);
 
@@ -278,28 +365,42 @@ namespace ServiceStation_01
             _details.Add(CreateScheduledMintenance());
             _details.Add(CreateSnubber());
             _details.Add(CreateTimingBelt());
-
         }
 
         public void ShowInfo()
         {
-            Console.WriteLine($"название\t\tизнос");
-            for (int i = 0; i < _details.Count; i++)
+            var filteredByCondition = _details.OrderBy(detail =>detail.Condition).ToList();
+            Console.WriteLine($"название\t\tсостояние");
+            for (int i = 0; i < filteredByCondition.Count; i++)
             {
-                _details[i].ShowInfo(_minCondition);
+                filteredByCondition[i].ShowInfo(_minCondition);
             }
         }
 
         public void GetBrokenDetail()
         {
             var brokenDetail = from Detail detail in _details
-                               where detail.Condition <= 20
+                               where detail.Condition <= _minCondition
                                select detail;
 
             foreach (var detail in brokenDetail)
             {
                 Console.WriteLine($"{detail.Name} - {detail.Condition}");
             }
+        }
+
+        public void ReplaceDetail(int index, int newCondition)
+        {
+            _details[index].SetNewCondition(newCondition);
+        }
+
+        public bool AvaliableCondition(int index)
+        {
+            return _details[index].Condition <= _minCondition;
+        }
+        public int GetPrice(int index)
+        {
+            return _details[index].Price;
         }
 
         protected override BrakePads CreateBrakePads()
@@ -362,7 +463,7 @@ namespace ServiceStation_01
 
         public void ShowInfo()
         {
-            Console.WriteLine($"{Name} \t   {Quantity} \t{Price}");
+            Console.WriteLine($"{Name} \t   {Quantity} \t{Price}\t{Price/2}");
         }
 
         public void ShowInfo(int minCondition)
@@ -374,14 +475,24 @@ namespace ServiceStation_01
             {
                 Console.ForegroundColor = ConsoleColor.Red;
             }
-
+            
             Console.WriteLine($"{Name} \t{Condition:d2}");
             Console.ForegroundColor = color;
         }
 
         public void SetQuantity(int value)
         {
-            Quantity = value;
+            Quantity += value;
+        }
+
+        public void SetTestQuantity()
+        {
+            Quantity = 5;
+        }
+
+        public void SetNewCondition(int value)
+        {
+            Condition = value;
         }
     }
 
