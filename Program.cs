@@ -58,11 +58,10 @@ namespace ServiceStation_01
                 car.ShowInfo();
 
                 CarRepair(car);
-
-                //Console.Write($"нажмите enter для следующей машины: ");
-                //Console.ReadKey();
             }
 
+            Console.Write($"рабочий день окончен\nнажмите любую для завершения ...");
+            Console.ReadKey();
         }
 
         private void CreateCar(int number)
@@ -282,6 +281,21 @@ namespace ServiceStation_01
             return _details[index].Name;
         }
 
+        public int GetCount()
+        {
+            return _details.Count;
+        }
+
+        public int GetNewDetailCondition(int index)
+        {
+            return _details[index].Condition;
+        }
+
+        public bool AvailableQuantity(int index)
+        {
+            return _details[index].Quantity > 0;
+        }
+
         private void ChangeQuantity()
         {
             int freePlaces = _maxCapacity - _capacity;
@@ -324,21 +338,6 @@ namespace ServiceStation_01
             Console.Write($"любую для продолжения ...");
             Console.ReadKey();
             Console.Clear();
-        }
-
-        public int GetCount()
-        {
-            return _details.Count;
-        }
-
-        public int GetNewDetailCondition(int index)
-        {
-            return _details[index].Condition;
-        }
-
-        public bool AvailableQuantity(int index)
-        {
-            return _details[index].Quantity > 0;
         }
 
         private int CalculateCapacity()
